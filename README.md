@@ -212,6 +212,24 @@ Il faut fournir le fichier CSV récupéré dans Bitfinex (https://report.bitfine
 
 Les colones du CSV d'origine doivent être : `#,DESCRIPTION,CURRENCY,AMOUNT,BALANCE,DATE,WALLET`
 
+#### Bittrex [![Support bon](https://img.shields.io/badge/support-bon-blue)](#bittrex-)
+
+```
+  -bittrex string
+        Bittrex CSV file
+  -bittrex_api_key string
+        Bittrex API key
+  -bittrex_api_secret string
+        Bittrex API secret
+```
+Il faut fournir les fichiers CSV récupérés dans Bittrex (https://global.bittrex.com/history puis "Download Order History").
+
+Les colones du CSV d'origine doivent être : `Uuid,Exchange,TimeStamp,OrderType,Limit,Quantity,QuantityRemaining,Commission,Price,PricePerUnit,IsConditional,Condition,ConditionTarget,ImmediateOrCancel,Closed,TimeInForceTypeId,TimeInForce`
+
+Il est nécessaire de fournir l'API et le CSV car chaque support a son défaut :
+- l'API ne retourne pas les transactions liées à des assets délistés.
+- le CSV ne comprend pas l'historique de dépot/retrait.
+
 #### BTC [![Support avancé](https://img.shields.io/badge/support-avanc%C3%A9-green)](#btc-)
 
 ```
@@ -249,12 +267,22 @@ Expériemental.
         Crypto.com Exchange Stake CSV file
   -cdc_ex_supercharger string
         Crypto.com Exchange Supercharger CSV file
+  -cdc_ex_api_key string
+        Crypto.com Exchange API Key
+  -cdc_ex_secret_key string
+        Crypto.com Exchange Secret Key
   -cdc_ex_transfer string
         Crypto.com Exchange Deposit/Withdrawal CSV file
 ```
 Il faut fournir les CSV récupérés dans l'App et l'Exchange Crypto.com (pour le SuperCharger, il faut le créer à la main car on ne peut pas le télécharger pour l'instant).
 
 Le CSV de l'APP doit etre celui des Transactions du Portefeuille Crypto.
+
+Pour l'API de l'Exchange, il faut donner le api_key et secret_key que vous pouvez créer dans votre compte.
+
+Il faut activer le droit de "Withdrawal" (si disponible pour vous) si vous voulez récupérer les `Withdrawals` et `Deposits` (je ne l'ai pas, je ne peux pas tester). Dans le cas contraire, le CSV Transfers permet de les mettre dans l'outil sans l'API.
+
+Par contre les `Exchanges` sur le Spot Market seront bien récupérés sans droit particulier (attention tout de même c'est assez long, on ne peut faire qu'une requête par seconde pour récupérer les Trades d'une seule journée, il faut donc de nombreuses requêtes pour remonter au jour du lancement de l'Exchange le 14 Nov 2019).
 
 Les colones du CSV du portefeuille Crypto de l'APP doivent être : `Timestamp (UTC),Transaction Description,Currency,Amount,To Currency,To Amount,Native Currency,Native Amount,Native Amount (in USD),Transaction Kind`
 

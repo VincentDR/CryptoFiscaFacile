@@ -7,9 +7,9 @@ import (
 	"os"
 	"time"
 
-	// "github.com/davecgh/go-spew/spew"
 	"github.com/fiscafacile/CryptoFiscaFacile/binance"
 	"github.com/fiscafacile/CryptoFiscaFacile/bitfinex"
+	"github.com/fiscafacile/CryptoFiscaFacile/bittrex"
 	"github.com/fiscafacile/CryptoFiscaFacile/blockchain"
 	"github.com/fiscafacile/CryptoFiscaFacile/blockstream"
 	"github.com/fiscafacile/CryptoFiscaFacile/btc"
@@ -51,8 +51,13 @@ func main() {
 	pCSVBinance := flag.String("binance", "", "Binance CSV file")
 	pCSVBinanceExtended := flag.Bool("binance_extended", false, "Use Binance CSV file extended format")
 	pCSVBitfinex := flag.String("bitfinex", "", "Bitfinex CSV file")
+	pAPIBittrexKey := flag.String("bittrex_api_key", "", "Bittrex API key")
+	pAPIBittrexSecret := flag.String("bittrex_api_secret", "", "Bittrex API secret")
+	pCSVBittrex := flag.String("bittrex", "", "Bittrex CSV file")
 	pCSVCoinbase := flag.String("coinbase", "", "Coinbase CSV file")
 	pCSVCdCAppCrypto := flag.String("cdc_app_crypto", "", "Crypto.com App Crypto Wallet CSV file")
+	pCdCExAPIKey := flag.String("cdc_ex_api_key", "", "Crypto.com Exchange API Key")
+	pCdCExSecretKey := flag.String("cdc_ex_secret_key", "", "Crypto.com Exchange Secret Key")
 	pCSVCdCExTransfer := flag.String("cdc_ex_transfer", "", "Crypto.com Exchange Deposit/Withdrawal CSV file")
 	pCSVCdCExStake := flag.String("cdc_ex_stake", "", "Crypto.com Exchange Stake CSV file")
 	pCSVCdCExSupercharger := flag.String("cdc_ex_supercharger", "", "Crypto.com Exchange Supercharger CSV file")
@@ -63,6 +68,7 @@ func main() {
 	pCSVMetaMask := flag.String("metamask", "", "MetaMask CSV file")
 	pCSVMyCelium := flag.String("mycelium", "", "MyCelium CSV file")
 	pCSVRevo := flag.String("revolut", "", "Revolut CSV file")
+	pDebug := flag.Bool("debug", false, "Debug Mode (only for devs)")
 	flag.Parse()
 	if *pCoinAPIKey != "" {
 		wallet.CoinAPISetKey(*pCoinAPIKey)
@@ -78,6 +84,11 @@ func main() {
 		}
 		categ.ParseCSVCategory(recordFile)
 	}
+	loc, err := time.LoadLocation(*pLocation)
+	if err != nil {
+		log.Fatal("Error parsing Location:", err)
+	}
+	// Launch APIs access in go routines
 	btc := btc.New()
 	blkst := blockstream.New()
 	if *pCSVBtcAddress != "" {
@@ -97,6 +108,12 @@ func main() {
 		ethsc.APIConnect(*pEtherscanAPIKey)
 		go ethsc.ParseCSV(recordFile, *categ)
 	}
+	cdc := cryptocom.New()
+	if *pCdCExAPIKey != "" && *pCdCExSecretKey != "" {
+		cdc.NewExchangeAPI(*pCdCExAPIKey, *pCdCExSecretKey, *pDebug)
+		cdc.GetAPIExchangeTxs(loc)
+	}
+	// Now parse local files
 	bc := blockchain.New()
 	if *pJsonBtgTXs != "" {
 		jsonFile, err := os.Open(*pJsonBtgTXs)
@@ -134,6 +151,23 @@ func main() {
 			log.Fatal("Error parsing Bitfinex CSV file:", err)
 		}
 	}
+	btrx := bittrex.New()
+	if *pCSVBittrex != "" {
+		recordFile, err := os.Open(*pCSVBittrex)
+		if err != nil {
+			log.Fatal("Error opening Bittrex CSV file:", err)
+		}
+		err = btrx.ParseCSV(recordFile)
+		if err != nil {
+			log.Fatal("Error parsing Bittrex CSV file:", err)
+		}
+		if *pAPIBittrexKey != "" && *pAPIBittrexSecret != "" {
+			go btrx.GetAllTransferTXs(*pAPIBittrexKey, *pAPIBittrexSecret, *categ)
+			go btrx.GetAllTradeTXs(*pAPIBittrexKey, *pAPIBittrexSecret, *categ)
+		} else {
+			log.Println("Warning, you should provide your API Key/Secret to retrieve Deposits and Withdrawals")
+		}
+	}
 	cb := coinbase.New()
 	if *pCSVCoinbase != "" {
 		recordFile, err := os.Open(*pCSVCoinbase)
@@ -145,13 +179,12 @@ func main() {
 			log.Fatal("Error parsing Coinbase CSV file:", err)
 		}
 	}
-	cdc := cryptocom.New()
 	if *pCSVCdCAppCrypto != "" {
 		recordFile, err := os.Open(*pCSVCdCAppCrypto)
 		if err != nil {
 			log.Fatal("Error opening Crypto.com CSV file:", err)
 		}
-		err = cdc.ParseCSVCrypto(recordFile)
+		err = cdc.ParseCSVAppCrypto(recordFile)
 		if err != nil {
 			log.Fatal("Error parsing Crypto.com CSV file:", err)
 		}
@@ -161,7 +194,7 @@ func main() {
 		if err != nil {
 			log.Fatal("Error opening Crypto.com Exchange Deposit/Withdrawal CSV file:", err)
 		}
-		err = cdc.ParseCSVExTransfer(recordFile)
+		err = cdc.ParseCSVExchangeTransfer(recordFile)
 		if err != nil {
 			log.Fatal("Error parsing Crypto.com Exchange Deposit/Withdrawal CSV file:", err)
 		}
@@ -171,7 +204,7 @@ func main() {
 		if err != nil {
 			log.Fatal("Error opening Crypto.com Exchange Stake CSV file:", err)
 		}
-		err = cdc.ParseCSVExStake(recordFile)
+		err = cdc.ParseCSVExchangeStake(recordFile)
 		if err != nil {
 			log.Fatal("Error parsing Crypto.com Exchange Stake CSV file:", err)
 		}
@@ -181,7 +214,7 @@ func main() {
 		if err != nil {
 			log.Fatal("Error opening Crypto.com Exchange Supercharger CSV file:", err)
 		}
-		err = cdc.ParseCSVExSupercharger(recordFile)
+		err = cdc.ParseCSVExchangeSupercharger(recordFile)
 		if err != nil {
 			log.Fatal("Error parsing Crypto.com Exchange Supercharger CSV file:", err)
 		}
@@ -268,6 +301,16 @@ func main() {
 			log.Fatal("Error parsing Ethereum CSV file:", err)
 		}
 	}
+	if *pAPIBittrexKey != "" && *pAPIBittrexSecret != "" {
+		errTransfer := btrx.WaitTransfersFinish()
+		if errTransfer != nil {
+			log.Fatalln("Error parsing Bittrex API transfers:", errTransfer)
+		}
+		errTrades := btrx.WaitTradesFinish()
+		if errTrades != nil {
+			log.Fatalln("Error parsing Bittrex API trades:", errTrades)
+		}
+	}
 	if *pCSVBtcAddress != "" {
 		err := blkst.WaitFinish()
 		if err != nil {
@@ -290,6 +333,7 @@ func main() {
 	global := make(wallet.TXsByCategory)
 	global.Add(b.TXsByCategory)
 	global.Add(bf.TXsByCategory)
+	global.Add(btrx.TXsByCategory)
 	global.Add(cb.TXsByCategory)
 	global.Add(cdc.TXsByCategory)
 	global.Add(kr.TXsByCategory)
@@ -304,10 +348,6 @@ func main() {
 	global.FindTransfers()
 	totalCommercialRebates, totalInterests, totalReferrals := global.FindCashInOut(*pNative)
 	global.SortTXsByDate(true)
-	loc, err := time.LoadLocation(*pLocation)
-	if err != nil {
-		log.Fatal("Error parsing Location:", err)
-	}
 	if *pStats {
 		global.PrintStats(*pNative, totalCommercialRebates, totalInterests, totalReferrals)
 	}
